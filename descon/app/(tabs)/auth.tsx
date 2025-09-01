@@ -11,9 +11,11 @@ export default function Auth() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
 const handleAuth = async () => {
   try {
+    setLoading(true);
     const url = isSignUp 
     ? `${baseURL}/user/signup`
     : `${baseURL}/user/signin`;
@@ -36,7 +38,9 @@ const handleAuth = async () => {
 
 
     if (!res.ok) {
-      console.log('Error:', data.error);
+      Alert.alert('Error', data.error || 'An error occurred');
+      setLoading(false);
+ 
       return;
     }
 
@@ -44,7 +48,9 @@ const handleAuth = async () => {
     setEmail("")
     setName("")
     setPassword("")
-    console.log(isSignUp ? 'Sign Up Success:' : 'Sign In Success:', data);
+    setLoading(false);
+    Alert.alert('Success', isSignUp ? 'Sign Up Successful!' : 'Sign In Successful!');
+
     
 
   
@@ -63,7 +69,15 @@ const handleAuth = async () => {
 
   return (
     <View style={styles.container}>
+
+
+{
+  loading && <Text style={{ textAlign: 'center', marginBottom: 10 }}>Processing...</Text>
+  
+}
+
       <Text style={styles.title}>{isSignUp ? 'Sign Up' : 'Sign In'}</Text>
+
 
       {isSignUp && (
         <TextInput

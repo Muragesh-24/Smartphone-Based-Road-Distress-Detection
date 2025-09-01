@@ -49,9 +49,14 @@ export default function AdminDashboard() {
           <Text style={styles.modalTitle}>Report Details</Text>
           <ScrollView>
             
-            {selectedReport?.images_url?.split(",").map((url: string, idx: number) => (
-              <Image key={idx} source={{ uri: url }} style={styles.fullImage} />
-            ))}
+          {(selectedReport?.images_url?.split(",").filter(Boolean) ?? []).map((url : string, idx : number) => (
+  <Image 
+    key={idx} 
+    source={{ uri: url.trim() }} 
+    style={styles.fullImage} 
+  />
+))}
+
           </ScrollView>
           {selectedReport?.pdf_url ? (
 <TouchableOpacity

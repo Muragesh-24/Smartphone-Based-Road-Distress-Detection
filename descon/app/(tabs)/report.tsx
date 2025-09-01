@@ -1,16 +1,16 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity, Platform ,Image, Alert} from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, TouchableOpacity, Platform ,Image, Alert, ActivityIndicator, Modal, TextInput} from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Video } from 'expo-av';
+
 import * as Location from 'expo-location';
-import { AntDesign } from '@expo/vector-icons';
+
 import * as Print from "expo-print";
 import { shareAsync } from "expo-sharing";
 
  
-import PhotoPreviewSection from '@/components/PhotoPreviewsection';
+
 import useCurrentAddress from '@/components/UsecurrentAd';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -20,6 +20,8 @@ export default function Report() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
+  const [placee, setPlace] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   // keep camera ref as any since CameraView typing can be tricky
   const cameraRef = useRef<any>(null);
 
@@ -43,6 +45,11 @@ export default function Report() {
   const [photoreportsUri, setPhotoUri] = useState<string[] | null>(null);
   const [aireport,setAireport]=useState("")
   const[reporturi,setReporturi]=useState("")
+  const [detectioninterval,setDetectioninterval]=useState(5000)
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [inputValue, setInputValue] = useState(0);
+
 
 
 useEffect(()=>{
@@ -50,20 +57,25 @@ getUserId()
 
 
 
+
 },[])
 
-function buildSimpleReport(photos: string[] | null, aiText: string) {
-  const photoFigures = (photos || [])
-    .map(
-      (src, i) => `
-        <figure style="margin:0 0 12px 0; page-break-inside:avoid;">
-          <img src="http://172.23.35.151:5000${src}" style="width:100%; border:1px solid #ccc; border-radius:6px;" />
-          <figcaption style="font-size:10px; color:#555; text-align:center;">
-            Photo ${i + 1}
-          </figcaption>
-        </figure>`
-    )
-    .join("");
+function buildSimpleReport(photos: string[] | null, aiText: string, place: string) {
+  // Split photos: first half before AI text, rest after
+  const half = Math.ceil((photos?.length || 0) / 2);
+  const firstPhotos = (photos || []).slice(0, half);
+  const laterPhotos = (photos || []).slice(half);
+
+  const renderPhotos = (phs: string[], startIndex = 0) =>
+    phs.map((src, i) => `
+      <figure style="margin:0 0 20px 0; page-break-inside:avoid; text-align:center;">
+        <img src="http://10.231.240.143:5000${src}"
+             style="max-width:100%; border:1px solid #ddd; border-radius:8px;" />
+        <figcaption style="font-size:11px; color:#555; margin-top:6px;">
+          Photo ${startIndex + i + 1}
+        </figcaption>
+      </figure>
+    `).join("");
 
   return `
   <html>
@@ -72,21 +84,33 @@ function buildSimpleReport(photos: string[] | null, aiText: string) {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Inspection Report</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; padding: 20px; color:#111; }
-        h1 { font-size: 18px; margin-bottom: 4px; }
-        h2 { font-size: 14px; margin-top: 20px; margin-bottom: 8px; border-bottom:1px solid #ddd; }
-        p { margin: 0 0 10px 0; }
+        body { font-family: Arial, sans-serif; font-size: 12px; padding: 30px; color:#111; background:#fafafa; }
+        h1 { font-size: 20px; margin-bottom: 4px; color:#0f172a; }
+        h2 { font-size: 16px; margin-top: 24px; margin-bottom: 12px; color:#1e293b; border-bottom:1px solid #ddd; padding-bottom:4px; }
+        p { line-height:1.5; }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin-bottom:20px; }
       </style>
     </head>
     <body>
       <h1>Inspection Report</h1>
-      <p>Date: ${new Date().toLocaleString()}</p>
+      <p><b>Date:</b> ${new Date().toLocaleString()}</p>
+      <p><b>Place:</b> ${place || "Not specified"}</p>
+
+      <h2>Initial Photo Evidence</h2>
+      ${renderPhotos(firstPhotos)}
 
       <h2>AI Analysis</h2>
-      <p style="white-space: pre-wrap;">${aiText || "No AI report provided."}</p>
+      <div class="card">
+        <p style="white-space: pre-wrap;">${aiText || "No AI analysis provided."}</p>
+      </div>
 
-      <h2>Photo Evidence</h2>
-      ${photoFigures || "<p>No photos attached.</p>"}
+      <h2>Further Photo Evidence</h2>
+      ${renderPhotos(laterPhotos, half)}
+
+      <h2>Observations & Notes</h2>
+      <div class="card">
+        <p>Inspector can add manual observations, notes, or recommendations here.</p>
+      </div>
     </body>
   </html>
   `;
@@ -127,17 +151,18 @@ const generateLocalReport = () => {
     report += `  - ${name}: ${count}\n`;
   }
   setFinalreport(report)
-  alert("done")
+
   return report
 };
 
 // call this after stopping detection instead of fetching from backend
 
 
+
   const generatePDF = async () => {
     try {
       const { uri } = await Print.printToFileAsync({
-        html: buildSimpleReport(photoreportsUri, aireport)
+        html: buildSimpleReport(photoreportsUri, aireport,placee?placee:"")
       });
 
       console.log("PDF generated at:", uri);
@@ -186,16 +211,18 @@ const sendChatRequest = async (report : string
       alert("Missing data for AI report!");
       return;
     }
+const plac=await getAddressFromCoords(location?.coords.latitude || 0, location?.coords.longitude || 0)
 
     const payload = {
       report,
+  
       // location: {
       //   lat: location.coords.latitude,
       //   lng: location.coords.longitude,
       // }
     };
 
-    const res = await fetch("http://172.23.35.151:5000/chat", {
+    const res = await fetch("http://10.231.240.143:5000/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -229,7 +256,7 @@ const ReportHandler = async () => {
   try {
  
     // const loc = await Location.getCurrentPositionAsync({});
-    const html = buildSimpleReport(photoreportsUri, aireport);
+    const html = buildSimpleReport(photoreportsUri, aireport,placee?placee:"");
     const { uri } = await Print.printToFileAsync({ html });
 
     const userId = await AsyncStorage.getItem("user_id");
@@ -304,7 +331,7 @@ formData.append("image", file as any);
     formData.append("latitude", location.coords.latitude.toString());  // latitude
     formData.append("longitude", location.coords.longitude.toString()); // longitude
 
-    const res = await fetch("http://172.23.35.151:5000/detect-frame", {
+    const res = await fetch("http://10.231.240.143:5000/detect-frame", {
       method: "POST",
       body: formData,
     });
@@ -335,9 +362,45 @@ setPhotoUri(prev => {
 
   /** START/STOP LIVE DETECTION **/
   const startDetection = async () => {
-    await getLocation();
-    setIsDetecting(true);
+    // await getLocation();
+    
+        setModalVisible(true);
+  
+ if (!inputValue) {
+      alert("You must enter a value to start detection!");
+      return;
+    }
+
+
+  // You can check if user entered something
+ 
+
+
+
+   
   };
+const handleSpeed = () => {
+  if (!inputValue) {
+    alert("You must enter a value to start detection!");
+    return;
+  }
+
+  setModalVisible(false);
+
+  //use a formula////////////////////////////////////////
+
+
+  const speedMs = inputValue * 1000 / 3600; // km/h -> m/s
+  const d = 5; 
+  let interval = d / speedMs; // seconds per frame
+
+  // clamp interval to reasonable bounds
+  if (interval < 0.2) interval = 0.2;  // min 0.2s
+    // max 2s
+  setDetectioninterval(interval*1000); // set the value
+  setIsDetecting(true);             // start detection
+};
+
 const stopDetectionAndGetReport = async () => {
   setIsDetecting(false);
 
@@ -392,6 +455,7 @@ const pickVideo = async (fromCamera = false) => {
 
 const uploadVideo = async (uri: string) => {
   if (!uri) return;
+  setLoading(true);
 
   try {
     const formData = new FormData();
@@ -402,7 +466,7 @@ const uploadVideo = async (uri: string) => {
       type: "video/mp4",   // mime type
     } as any);
 
-    const res = await fetch("http://172.23.35.151:5000/upload-video", {
+    const res = await fetch("http://10.231.240.143:5000/upload-video", {
       method: "POST",
       body: formData,
       headers: {
@@ -440,6 +504,7 @@ setPhotoUri(prev => {
 
  const report = generateLocalReport()
 sendChatRequest(report)
+setLoading(false)
   console.log('Updated array:', updated);
   return updated;
 });
@@ -448,11 +513,13 @@ sendChatRequest(report)
   }
 };
 const place =useCurrentAddress()
+// setPlace(place)
   /** CAMERA CONTROLS **/
   const toggleCameraFacing = () => setFacing(prev => (prev === 'back' ? 'front' : 'back'));
   const handleTakePhoto = async () => {
     if (!cameraRef.current) return;
     // take a photo and show preview (no base64)
+  
     const takenPhoto = await cameraRef.current.takePictureAsync();
     setPhoto(takenPhoto);
   };
@@ -462,7 +529,7 @@ const place =useCurrentAddress()
   useEffect(() => {
     if (isDetecting) {
       // start capturing every 5s
-      intervalRef.current = setInterval(captureFrame, 5000);
+      intervalRef.current = setInterval(captureFrame, detectioninterval);
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -490,7 +557,6 @@ const place =useCurrentAddress()
       </View>
     );
 
-  if (photo) return <PhotoPreviewSection photo={photo} handleRetakePhoto={handleRetakePhoto} />;
 
   
   return (
@@ -500,16 +566,39 @@ const place =useCurrentAddress()
 
       {/* Top buttons */}
       <View style={styles.topButtons}>
-      <Button title="Upload from Gallery" onPress={() => pickVideo()} />
+<TouchableOpacity style={styles.button} onPress={()=>{pickVideo()}}>
+  <Text style={styles.buttonText}>📂 Upload</Text>
+</TouchableOpacity>
 
-      
-        <Button
-          title={isDetecting ? 'Stop Live Detection' : 'Start Live Detection'}
-          onPress={() => {
-            if (isDetecting) stopDetectionAndGetReport();
-            else startDetection();
-          }}
+<TouchableOpacity
+  style={[styles.button, isDetecting && { backgroundColor: "#00495fff" }]}
+  onPress={() => {
+    if (isDetecting) stopDetectionAndGetReport();
+    else startDetection();
+  }}
+>
+  <Text style={styles.buttonText}>
+    {isDetecting ? "⏹ Stop Live Detection" : "🎥 Start Live Detection"}
+  </Text>
+</TouchableOpacity>
+<Modal visible={modalVisible} transparent animationType="slide">
+  <View style={styles.modalContainer}>
+    <View style={styles.modalContent}>
+      <Text>Enter your speed in km/hr:</Text>
+      <TextInput
+        style={styles.input}
+        value={inputValue.toString()}   
+        onChangeText={(text) => setInputValue(parseInt(text) || 0)}
+        placeholder="Type here..."
+        keyboardType="numeric"       
         />
+      <Button title="Submit" onPress={handleSpeed} />  
+ 
+    </View>
+  </View>
+</Modal>
+
+
       </View>
 
       {/* Live Camera */}
@@ -518,21 +607,21 @@ const place =useCurrentAddress()
           <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
             <View style={styles.cameraControls}>
               <TouchableOpacity style={styles.iconButton} onPress={toggleCameraFacing}>
-                <AntDesign name="retweet" size={44} color="white" />
+    
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconButton} onPress={handleTakePhoto}>
-                <AntDesign name="camera" size={44} color="white" />
+     
               </TouchableOpacity>
             </View>
           </CameraView>
           <Text style={styles.detectionText}>Detections: {detections.length}</Text>
         </View>
       )}
-
+{/* <Video source={{ uri: videoUri }} style={styles.video} useNativeControls /> */}
       {/* Video display */}
       <View style={styles.videoBox}>
         <Text style={styles.boxTitle}>Uploaded Video</Text>
-        {videoUri ? <Video source={{ uri: videoUri }} style={styles.video} useNativeControls /> : <Text>No video uploaded</Text>}
+        {videoUri ? <View></View> : <Text>No video uploaded</Text>}
       </View>
 
       {/* <View style={styles.videoBox}>
@@ -565,7 +654,7 @@ const place =useCurrentAddress()
         // <TouchableOpacity key={index}onPress={() => setExpandedImage(`http://172.23.35.151:5000${x}`)}>
   <Image
     key={index}
-    source={{ uri: `http://172.23.35.151:5000${x}` }}
+    source={{ uri: `http://10.231.240.143:5000${x}` }}
     style={styles.reportImage}
   />
 //  </TouchableOpacity>
@@ -581,6 +670,13 @@ const place =useCurrentAddress()
   ) : (
     <Text style={{ textAlign: "center", marginTop: 20 }}>No report yet</Text>
   )}
+  {
+    (loading)&&(
+      <View>
+      <Text>System in action...</Text>
+      <ActivityIndicator size="large" color="#007bff" />
+  </View>)
+  }
 </View>
 
        </View>
@@ -591,6 +687,38 @@ const place =useCurrentAddress()
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
   permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  button: {
+  backgroundColor: "#007AFF",
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 10,
+  alignItems: "center",
+  marginVertical: 8,
+},
+buttonText: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "600",
+}, modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    marginVertical: 10,
+    padding: 8,
+    borderRadius: 5,
+  },
+
   topButtons: {  justifyContent: 'space-around', marginBottom: 20 },
   cameraBox: { height: 350, marginBottom: 20, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, overflow: 'hidden' },
   camera: { flex: 1 },
@@ -641,21 +769,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
-  button: {
-    flex: 1,
-    backgroundColor: "#FF6347",
-    paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 8,
-  },
+  // button: {
+  //   flex: 1,
+  //   backgroundColor: "#FF6347",
+  //   paddingVertical: 10,
+  //   marginHorizontal: 5,
+  //   borderRadius: 8,
+  // },
   downloadButton: {
     backgroundColor: "#4CAF50",
   },
-  buttonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "bold",
-  },
+  // buttonText: {
+  //   color: "#fff",
+  //   textAlign: "center",
+  //   fontWeight: "bold",
+  // },
 fullscreenOverlay: {
   position: "absolute",
   top: 0,

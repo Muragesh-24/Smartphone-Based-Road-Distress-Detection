@@ -1,37 +1,40 @@
 import { Text, View, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
-import ReportCard from "@/components/Reportcard";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Dimensions } from "react-native";
 import { router } from "expo-router";
-// import { WebView } from 'react-native-webview';
-import { useState } from "react";
 
-const { width, height } = Dimensions.get("window");
-//  const [markers, setMarkers] = useState([]);
 
-// const osmUrl = 'https://www.openstreetmap.org/#map=15/26.5088/80.2285';
+
 export default function HomePage() {
+
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         
-        {/* Map */}
-        {/* <View style={styles.mapBox}>
-        
-                <WebView source={{ uri: osmUrl }} style={styles.webview} />
-        </View> */}
+        {/* Header */}
+        <Text style={styles.title}>Welcome 👋</Text>
+        <Text style={styles.subtitle}>
+          Create and manage your reports effortlessly.
+        </Text>
 
-        {/* Create Report Button */}
-<TouchableOpacity
-  style={styles.button}
-  onPress={() => router.push("/(tabs)/report")}
->
-          <Text style={styles.buttonText}>➕ Create Report</Text>
-        </TouchableOpacity>
+        {/* Action Section */}
+        <View style={styles.centerBox}>
+          <TouchableOpacity
+            style={styles.button}
+            activeOpacity={0.8}
+            onPress={() => router.push("/(tabs)/report")}
+          >
+            <Text style={styles.buttonText}>➕ Create Report</Text>
+          </TouchableOpacity>
+        </View>
 
-        {/* Reports */}
-        
-        
+        {/* Info */}
+        <View style={styles.infoCard}>
+          <Text style={styles.helperTitle}>Why Reports?</Text>
+          <Text style={styles.helperText}>
+           Our platform lets you create detailed, professional PDF reports with a single tap. Powered by advanced machine learning, it automatically analyzes road damage from images or videos, summarizes findings, highlights key statistics, and compiles everything into a structured, government-ready report. Save time, improve accuracy, and share insights seamlessly.
+          </Text>
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -41,50 +44,76 @@ export default function HomePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f9fafb",
   },
-   map: {
-    flex: 1,
-    backgroundColor:"#000",
-    width: '100%',          
-    height: '100%', 
+  scrollContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 80,
   },
- scrollContainer: {
-  paddingHorizontal: 20,
-  paddingTop: 10,
-  backgroundColor:"#fff",
-  paddingBottom: 80, // matches footer height
-},
-webview: { flex: 1 },
-  reportsContainer: {
-    gap: 12, // modern RN supports gap
+  title: {
+    fontSize: 30,
+    fontWeight: "700", // use Inter_700Bold if loaded
+    color: "#1e293b",
+    textAlign: "center",
+    letterSpacing: 0.3,
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontWeight: "bold",
-    fontSize: 18,
-    marginBottom: 12,
-    marginTop: 20,
+  subtitle: {
+    fontSize: 17,
+    fontWeight: "400", // Inter_400Regular
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 40,
+  },
+  centerBox: {
+    alignItems: "center",
+    marginVertical: 20,
   },
   button: {
     backgroundColor: "#007AFF",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignSelf: "center",
-    marginVertical: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 4,
   },
   buttonText: {
     color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "600", // Inter_600SemiBold
+    textAlign: "center",
+    letterSpacing: 0.6,
   },
-  mapBox: {
-    backgroundColor: "#e6e6e6",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    width: width - 32,
-    height: height * 0.25,
-    
+  infoCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 22,
+    marginTop: 40,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  helperTitle: {
+    fontSize: 18,
+    fontWeight: "600", // Inter_600SemiBold
+    color: "#0f172a",
+    marginBottom: 10,
+    textAlign: "center",
+    letterSpacing: 0.4,
+  },
+  helperText: {
+    fontSize: 15,
+    fontWeight: "400",
+    color: "#475569",
+    textAlign: "center",
+    lineHeight: 22,
+    letterSpacing: 0.2,
   },
 });

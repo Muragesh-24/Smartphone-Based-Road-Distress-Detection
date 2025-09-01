@@ -15,12 +15,14 @@
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_API_KEY_HERE"
-        }},
+        }
+      },
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.murageshcn.descon"
     },
     "web": {
       "bundler": "metro",
@@ -41,6 +43,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5866a512-fbb1-4035-8662-d159a6a237b7"
+      }
     }
   }
 }

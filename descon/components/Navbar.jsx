@@ -1,11 +1,11 @@
 import { View, Text, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
 
 export default function Navbar() {
   return (
     <View edges={["top"]} style={styles.safeArea}>
       <View style={styles.navbar}>
-        <Text style={styles.title}>SmartBot</Text>
+        <Text style={styles.title}>StreetScan</Text>
       </View>
     </View>
   );

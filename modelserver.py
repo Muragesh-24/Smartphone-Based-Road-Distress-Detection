@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -125,6 +124,8 @@ def detect_frame():
         # YOLO detection
         print("Running model prediction...")
         results = model.predict(source=img, save=False, conf=0.25)
+
+        
         annotated_img = results[0].plot()
         print("Model prediction done.")
         # save annotated
@@ -168,6 +169,11 @@ openai.api_base = "https://api.groq.com/openai/v1"
 def chat():
     try:
         data = request.get_json()
+
+   
+
+        
+        print(data)
         finalreport = data.get("finalreport", "")
         # location = data.get("location", {})
        
@@ -183,13 +189,18 @@ def chat():
             messages=[{
             "role": "system",
             "content": (
-                "You are an assistant that transforms rough road damage notes "
-                "into a formal, professional report suitable for submission to government officials. "
-                "Your submission must be final: do not include placeholders, brackets, or filler text. "
-                "Structure the report with clear headings such as Location, Issue, Impact, and Recommendations. "
-                "Keep it professional, concise, and authoritative."
+                "You are an assistant that converts rough road damage notes "
+            "into a formal government-ready report. "
+           
+            f"Summarize the user's message {finalreport}clearly without adding extra commentary. "
+            "Highlight any numbers, statistics, or measurements. "
+            "Structure the report with the following sections:\n\n"
+         "1. Issue\n2. Impact\n3. Recommendations\n\n"
+            "Keep the tone professional, concise, and authoritative. "
+            "Do not add placeholders or unnecessary text."
+               
             ),
-        },{"role": "user", "content": user_message}],
+        },{"role": "user", "content": finalreport}],
         )
         print(completion.choices[0].message["content"])
         return jsonify({"reply": completion.choices[0].message["content"]})
@@ -198,30 +209,25 @@ def chat():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-payload = {
-    "predictions": [{
-        "x": 123,
-        "y": 456,
-        "width": 789,
-        "height": 101,
-        "confidence": 0.95,
-        "class": "0",
-        "class_id": 0,
-        "detection_id": "unique-id-123"
-    }],
+
+data = {
+    "report_id": "report123",
     "gps": "28.6139,77.2090",
-    "report_id": "REPORT123"
+    "predictions": json.dumps([
+        {"x1": 100, "y1": 150, "x2": 200, "y2": 250, "confidence": 0.95, "class": "crack", "class_id": 0}
+ 
+    ])
 }
 @app.route("/upload-video", methods=["POST"])
 def upload_video():
     try:
-        print(request.files)
-        print(request.form)
         if "video" not in request.files or "key" not in request.form:
             return jsonify({"error": "Missing video or key"}), 400
 
         vid_file = request.files["video"]
         user_key = request.form["key"]
+        lat = float(request.form.get('latitude', 0))
+        lon = float(request.form.get('longitude', 0))
 
         # Save uploaded video
         vid_path = save_uploaded_file(vid_file, prefix="video")
@@ -242,49 +248,46 @@ def upload_video():
             if i % interval != 0:
                 continue  # skip frames
              
-            print("Processing frame")
             results = model.predict(source=frame, save=False, conf=0.25)
-            # results = model(frame, conf=0.25)
-            print("skdms")
-            detection_json = results[0].to_json()
-            detections = json.loads(detection_json)
-            print(detections)
+            boxes = results[0].boxes.cpu().numpy()
+
+            # Format predictions correctly for app.py
+            formatted_predictions = []
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0]  # Get coordinates in x1,y1,x2,y2 format
+                formatted_pred = {
+                    "x1": float(x1),
+                    "y1": float(y1),
+                    "x2": float(x2),
+                    "y2": float(y2),
+                    "confidence": float(box.conf[0]),
+                    "class": str(int(box.cls[0])),
+                    "class_id": int(box.cls[0])
+                }
+                formatted_predictions.append(formatted_pred)
+
             # Only save if there are detections
-            if detections and len(detections) > 0:
-                # print(len(detection_json)) 
-                # payload = {
-                #   "report_id": "REPORT123",
-                #   "gps": "28.6139,77.2090",
-                #  "image": frame,   
-                #  "boxes": [[867.47778,345.80396,1012.64478,425.27765],[867.47778,345.80396,1012.64478,    425.27765]],
-                #  "classes": [0, 0],
-                #  "confidences": [0.95, 0.88]
-                #         }
+            if formatted_predictions:
+                # Convert frame to JPEG bytes
                 _, buffer = cv2.imencode('.jpg', frame)
                 frame_bytes = buffer.tobytes()
 
                 files = {
-                    "image": ("frame.jpg", frame_bytes, "image/jpeg")
+                    'image': ('frame.jpg', frame_bytes, 'image/jpeg')
                 }
-             
-                # # data = {
-                 
-                # #     # "detections": json.dumps(detections)  # still send detection info
-                # # }
                 
-                # resp = requests.post(
-                #     "https://h5-descon.onrender.com/analyze_defect",
-                #     files=files,
-                #     json=payload,
-                    
+                data = {
+                    'report_id': user_key,
+                    'gps': f"{lat},{lon}",
+                    'predictions': json.dumps(formatted_predictions)
+                }
 
-                #     timeout=120
-                # )
-                # pr=get_yolov12_predictions(model,frame)
-                # res=send_predictions("https://h5-descon.onrender.com/analyze_defect","REPORT123","28.6139,77.2090",frame,pr)
+                # Send request to analyze_defect endpoint
+                url = "https://13.61.195.135:8000/analyze_defect"
+                response = requests.post(url, data=data, files=files)
+                response.raise_for_status()
 
-                # print("Status:", res.status_code)
-                # print("Response:", res.text)
+                # Save annotated frame
                 annotated = results[0].plot()
                 filename = f"{user_key}_{uuid.uuid4().hex[:8]}.jpg"
                 filepath = os.path.join(OUTPUT_DIR, filename)
@@ -294,25 +297,11 @@ def upload_video():
                 # Store in session
                 if user_key not in video_sessions:
                     video_sessions[user_key] = {"detections": [], "images": []}
-                video_sessions[user_key]["detections"].append(detection_json)
+                video_sessions[user_key]["detections"].append(formatted_predictions)
                 video_sessions[user_key]["images"].append(filepath)
-                all_detections.append(detection_json)
-
-
+                all_detections.append(formatted_predictions)
 
         cap.release()
-        print(annotated_urls,"dkdw0",all_detections)
-        _, buffer = cv2.imencode(".jpg", frame)
-        frame_b64 = base64.b64encode(buffer).decode("utf-8")
-        print(frame_b64)
-        print("ddkwdwkdnwkdnwdnwkdnwkdw")
-       
-
-
-
-
-
-
                                     
         return jsonify({
             "annotated_frames": annotated_urls,
@@ -325,17 +314,10 @@ def upload_video():
 
 
 
-
-
-
-
 @app.route("/outputs/<path:filename>", methods=["GET"])
 def serve_output(filename):
     """Serve files from OUTPUT_DIR (annotated images, processed videos, etc)."""
     return send_from_directory(os.path.abspath(OUTPUT_DIR), filename, as_attachment=False)
-
-
-
 
 # ---------- Run ----------
 if __name__ == "__main__":
